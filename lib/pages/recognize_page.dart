@@ -30,7 +30,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
 
   /// Work around
   Widget _buildStaticCard() {
-    return Container(
+    return SizedBox(
       height: 200,
       width: double.infinity,
       child: Card(
@@ -63,7 +63,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
     return AnimatedOpacity(
       opacity: _isRecording ? 1.0 : 0.0,
       duration: Duration(milliseconds: 300),
-      child: Container(
+      child: SizedBox(
         height: 200,
         width: double.infinity,
         child: Card(
