@@ -1,1 +1,1 @@
-enum HomeAction {setting}
+enum HomeAction { setting }

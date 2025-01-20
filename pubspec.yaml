@@ -38,6 +38,7 @@ dependencies:
     git:
       url: https://github.com/jonaskahn/whisper.flutter.git
       ref: main
+  dio: ^5.7.0
   introduction_screen: ^3.1.14
   waveform_recorder: ^1.4.0
   audioplayers: ^6.1.0
@@ -50,6 +51,7 @@ dependencies:
   animated_text_kit: ^4.2.2
   path_provider: ^2.1.5
   flutter_popup: ^3.3.4
+  timer_stop_watch: ^1.0.0
 
 dev_dependencies:
   flutter_test:

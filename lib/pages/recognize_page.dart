@@ -5,9 +5,10 @@ import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_popup/flutter_popup.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:private_meet/pages/chat_page.dart';
 import 'package:record/record.dart';
+import 'package:timer_stop_watch/timer_stop_watch.dart';
 import 'package:wave/config.dart';
 import 'package:wave/wave.dart';
 import 'package:whisper_flutter_new/whisper_flutter_new.dart';
@@ -22,11 +23,31 @@ class AudioRecorderScreen extends StatefulWidget {
 class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
+  final _timerStopWatch = TimerStopWatch();
+
+  String? _timer;
+  late Stream<String> _stopwatch;
   bool _isRecording = false;
   bool _isPlaying = false;
   bool _isAnalysis = false;
   String? _resultText;
   String? _recordingPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermission();
+    _stopwatch =
+        _timerStopWatch.setStopwatch(timeFormat: "hh:mm:ss", start: true);
+  }
+
+  @override
+  void dispose() {
+    _timerStopWatch.dispose();
+    _player.dispose();
+    _recorder.dispose();
+    super.dispose();
+  }
 
   /// Work around
   Widget _buildStaticCard() {
@@ -94,12 +115,6 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _checkPermission();
-  }
-
   Future<void> _checkPermission() async {
     if (!await _recorder.hasPermission()) {
       if (mounted) {
@@ -110,9 +125,19 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
     }
   }
 
+  void _resetStatesBeforeRecordOrUpload() {
+    setState(() {
+      _timer = null;
+      _resultText = null;
+      _isAnalysis = false;
+      _isPlaying = false;
+      _recordingPath = null;
+    });
+  }
+
   Future<void> _startRecording() async {
     if (_isRecording) return;
-
+    _resetStatesBeforeRecordOrUpload();
     try {
       final directory = await _getDownloadDir();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -181,12 +206,22 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
     }
   }
 
+  void _resetStateBeforeAnalysis() {
+    setState(() {
+      _isAnalysis = true;
+      _resultText = null;
+      _timer = null;
+      _stopwatch =
+          _timerStopWatch.setStopwatch(timeFormat: "hh:mm:ss", start: true);
+    });
+  }
+
   Future<void> _analysisVoice(BuildContext context) async {
+    if (_isAnalysis) {
+      return;
+    }
     try {
-      setState(() {
-        _isAnalysis = true;
-        _resultText = null;
-      });
+      _resetStateBeforeAnalysis();
       final modelDir = await _getDownloadDir();
       final whisper = Whisper(
           model: WhisperModel.medium,
@@ -194,11 +229,13 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
           downloadHost:
               "https://huggingface.co/ggerganov/whisper.cpp/resolve/main");
       if (_recordingPath != null && _recordingPath!.trim() != "") {
+        _timerStopWatch.startStopwatch();
         final transcription = await whisper.transcribe(
           transcribeRequest: TranscribeRequest(
               audio: _recordingPath!,
               // Path to audio file
               isTranslate: false,
+              isVerbose: true,
               language: "vi",
               // Translate result from audio lang to english text
               isNoTimestamps: false,
@@ -208,7 +245,11 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
               speedUp: true),
         );
         setState(() {
+          _isAnalysis = false;
+          _isRecording = false;
           _resultText = transcription.text;
+          _isPlaying = false;
+          _recordingPath = null;
         });
       }
     } catch (e) {
@@ -216,19 +257,18 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
     } finally {
       setState(() {
         _isAnalysis = false;
+        _stopwatch =
+            _timerStopWatch.setStopwatch(timeFormat: "hh:mm:ss", start: true);
       });
     }
   }
 
   Future<void> _uploadFile() async {
-    setState(() {
-      _recordingPath = null;
-      _isRecording = false;
-      _isAnalysis = false;
-      _resultText = null;
-    });
+    _resetStatesBeforeRecordOrUpload();
+    final instance = FilePicker.platform;
 
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result = await instance.pickFiles();
+    FilePickerStatus.done;
     if (result != null) {
       setState(() {
         _recordingPath = result.files.single.path;
@@ -241,12 +281,6 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
         ? await getExternalStorageDirectory()
         : await getLibraryDirectory();
     return libraryDirectory!.path;
-  }
-
-  @override
-  void dispose() {
-    _recorder.dispose();
-    super.dispose();
   }
 
   @override
@@ -272,6 +306,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
             const SizedBox(height: 40),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               FloatingActionButton(
+                heroTag: "btn1",
                 onPressed: _isRecording ? _stopRecording : _startRecording,
                 backgroundColor:
                     _isRecording ? Colors.red[600] : Colors.deepOrangeAccent,
@@ -284,6 +319,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
                 width: 40,
               ),
               FloatingActionButton(
+                heroTag: "btn2",
                 onPressed: () async {
                   _uploadFile();
                 },
@@ -303,8 +339,10 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
               endIndent: 0,
               color: Colors.deepOrange,
             ),
-            if (_recordingPath != null && !_isRecording) ...[
-              const SizedBox(height: 20),
+            if (_recordingPath != null &&
+                !_isRecording &&
+                _resultText == null) ...[
+              const SizedBox(height: 40),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -332,17 +370,12 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
                       onPressed: () async {
                         _analysisVoice(context);
                       },
-                      style: TextButton.styleFrom(
-                          backgroundColor:
-                              _isAnalysis ? Colors.red[900] : Colors.blue),
+                      style: TextButton.styleFrom(backgroundColor: Colors.blue),
                       child: Text(
-                        _isAnalysis ? "Stop" : "Analysis",
+                        "Analysis",
                         style: TextStyle(color: Colors.white),
                       ),
                     ),
-                  ),
-                  const SizedBox(
-                    width: 40,
                   ),
                 ],
               )
@@ -351,38 +384,77 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
               SizedBox(
                 height: 40,
               ),
+              StreamBuilder(
+                  stream: _stopwatch,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      _timer = snapshot.data.toString();
+                      return Text(
+                        snapshot.data.toString(),
+                        style: TextStyle(fontSize: 16),
+                      );
+                    } else if (snapshot.hasError) {
+                      print(snapshot.error);
+                      return SizedBox();
+                    } else {
+                      return CircularProgressIndicator();
+                    }
+                  }),
               SizedBox(
-                width: 250.0,
-                child: DefaultTextStyle(
-                    style: const TextStyle(
-                      color: Colors.deepPurple,
-                      fontSize: 18.0,
-                      fontWeight: FontWeight.normal,
-                    ),
-                    child: AnimatedTextKit(
-                      animatedTexts: [
-                        TypewriterAnimatedText(
-                          "Analysis is in process. You can't stop",
-                          textStyle: const TextStyle(
-                            fontSize: 32.0,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          speed: const Duration(milliseconds: 100),
-                        ),
-                      ],
-                      isRepeatingAnimation: true,
-                      pause: const Duration(milliseconds: 50),
-                      displayFullTextOnTap: true,
-                      stopPauseOnTap: true,
-                    )),
+                height: 20,
               ),
+              DefaultTextStyle(
+                  style: const TextStyle(
+                    color: Colors.deepPurple,
+                    fontSize: 16.0,
+                    fontWeight: FontWeight.normal,
+                  ),
+                  child: AnimatedTextKit(
+                    animatedTexts: [
+                      TypewriterAnimatedText(
+                        "analysis voice",
+                        textStyle: const TextStyle(
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        speed: const Duration(milliseconds: 100),
+                      ),
+                    ],
+                    repeatForever: _isAnalysis,
+                    isRepeatingAnimation: true,
+                    displayFullTextOnTap: true,
+                    stopPauseOnTap: false,
+                  )),
             ],
             if (_resultText != null) ...[
-              CustomPopup(
-                content: Text(_resultText!),
-                child: Icon(Icons.help),
+              SizedBox(
+                height: 40,
               ),
-            ]
+              SizedBox(
+                width: 120,
+                height: 60,
+                child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(data: _resultText!),
+                        ),
+                      );
+                    },
+                    style:
+                        ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                    child: Text(
+                      "Chat now",
+                      style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900),
+                    )),
+              ),
+              SizedBox(height: 40),
+              Text("Analysis in: $_timer")
+            ],
           ],
         ),
       ),
