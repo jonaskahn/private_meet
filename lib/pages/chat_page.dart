@@ -40,11 +40,11 @@ class _ChatScreenState extends State<ChatScreen> {
   int? _runningRequestId;
   List<ChatMessage> _messages = [];
 
-  final _modelName = 'qwen2.5-3b-instruct-q4_0.gguf';
+  final _modelName = 'qwen2.5-3b-instruct-q2_k.gguf';
   final _downloader = HuggingFaceDownloader(
       modelUrl:
-          'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_0.gguf?download=true',
-      fileName: 'qwen2.5-3b-instruct-q4_0.gguf');
+          'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q2_k.gguf?download=true',
+      fileName: 'qwen2.5-3b-instruct-q2_k.gguf');
 
   String? _modelPath;
   final TextEditingController _questionTextController = TextEditingController();
@@ -354,7 +354,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 child: Row(
                   children: [
-                    SingleChildScrollView(
+                    Expanded(
+                        child: SingleChildScrollView(
                       scrollDirection: Axis.vertical,
                       reverse: true,
                       child: TextField(
@@ -371,7 +372,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               horizontal: 16, vertical: 12),
                         ),
                       ),
-                    ),
+                    )),
                     SizedBox(width: 8),
                     SizedBox(
                       height: 50,
