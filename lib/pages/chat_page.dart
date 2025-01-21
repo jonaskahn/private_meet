@@ -1,10 +1,22 @@
 import 'dart:io';
 
+import 'package:fllama/fllama_universal.dart';
+import 'package:fllama/misc/openai.dart';
 import 'package:flutter/material.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:tsid_dart/tsid_dart.dart';
 
 import '../services/hugging_face_service.dart';
+
+class ChatMessage {
+  int id;
+  String text;
+  Role role;
+
+  ChatMessage({required this.id, required this.text, required this.role});
+}
 
 class ChatScreen extends StatefulWidget {
   final String data;
@@ -25,18 +37,29 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isModelExist = false;
   double _progress = 0;
   String _status = '';
+  int? _runningRequestId;
+  List<ChatMessage> _messages = [];
 
-  final _modelName = 'Qwen2.5-3B.Q4_0.gguf';
+  final _modelName = 'qwen2.5-3b-instruct-q4_0.gguf';
   final _downloader = HuggingFaceDownloader(
-    modelUrl:
-        'https://huggingface.co/QuantFactory/Qwen2.5-3B-GGUF/resolve/main/Qwen2.5-3B.Q4_0.gguf?download=true',
-    fileName: 'Qwen2.5-3B.Q4_0.gguf',
-  );
+      modelUrl:
+          'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_0.gguf?download=true',
+      fileName: 'qwen2.5-3b-instruct-q4_0.gguf');
+
+  String? _modelPath;
+  final TextEditingController _questionTextController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _checkModelExistence();
+    _messages = [];
+  }
+
+  @override
+  void dispose() {
+    _questionTextController.dispose();
+    super.dispose();
   }
 
   Future<Directory> get _tempModelDir async {
@@ -63,17 +86,70 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _isModelExist = file.existsSync();
+      _modelPath = file.path;
       if (_isModelExist) {
         _status = 'Downloaded';
       }
     });
   }
 
+  List<Message> convertFromChat(List<ChatMessage> messages) {
+    return messages
+        .map((message) => Message(message.role, message.text.trim()))
+        .toList();
+  }
+
+  Future<void> _runChatInference() async {
+    try {
+      setState(() {
+        _messages.add(ChatMessage(
+            id: Tsid.getTsid().toLong(),
+            text: _questionTextController.text.trim(),
+            role: Role.user));
+      });
+      final request = OpenAiRequest(
+        maxTokens: 1024,
+        messages: [
+          Message(Role.system,
+              """You are MDO assistant, trained by BSSD. Your goal is to help answer user question precisely and concisely from voice analysis data. Do not try to makeup the answer if you are do not know, answer in Vietnamese and markdown format.
+              """),
+          Message(Role.user,
+              "Chỉ trả lời câu hỏi của tôi với kết quả phân tích giọng nói sau đây\n ${widget.data}"),
+          Message(Role.assistant,
+              "Tất nhiên rồi, tôi sẽ chỉ trả lời câu hỏi của bạn với kết quả phân tích bạn cung cấp"),
+          ...convertFromChat(_messages)
+        ],
+        numGpuLayers: 99,
+        modelPath: _modelPath!,
+        topP: 1.0,
+        contextSize: 32000,
+        temperature: 0.7,
+      );
+      final response = ChatMessage(
+          id: Tsid.getTsid().toLong(), text: "...", role: Role.assistant);
+      _messages.add(response);
+      int requestId = await fllamaChat(request, (res, done) {
+        setState(() {
+          response.text = res.trim();
+          if (done) {
+            _runningRequestId = null;
+          }
+        });
+      });
+
+      setState(() {
+        _runningRequestId = requestId;
+      });
+      _questionTextController.clear();
+    } catch (e) {
+      print(e);
+    }
+  }
+
   Future<void> _moveFile(File source, String targetPath) async {
     try {
       await source.rename(targetPath);
     } catch (e) {
-      // If rename fails (e.g., across devices), try copy and delete
       try {
         await source.copy(targetPath);
         await source.delete();
@@ -103,7 +179,6 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      // Clean up any existing temp files
       await _cleanupTempDir();
 
       await _downloader.downloadModel(
@@ -135,6 +210,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 _status = 'Downloaded';
                 _isDownloading = false;
                 _isModelExist = true;
+                _modelPath = finalPath;
               });
             } else {
               throw Exception('Downloaded file not found in temp directory');
@@ -145,7 +221,6 @@ class _ChatScreenState extends State<ChatScreen> {
               _isDownloading = false;
             });
           } finally {
-            // Clean up temp directory
             await _cleanupTempDir();
           }
         },
@@ -194,31 +269,130 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16),
+      body: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            SizedBox(height: 20),
             if (!_isModelExist && !_isDownloading)
-              ElevatedButton(
-                onPressed: () => _startDownload(),
-                style: ElevatedButton.styleFrom(
-                    textStyle: TextStyle(fontWeight: FontWeight.w900)),
-                child: Text('Download Model'),
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: ElevatedButton(
+                  onPressed: () => _startDownload(),
+                  style: ElevatedButton.styleFrom(
+                      textStyle: TextStyle(fontWeight: FontWeight.w900)),
+                  child: Text('Download Model'),
+                ),
               ),
             if (_isDownloading)
-              Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 4,
-                    child: LinearProgressIndicator(value: _progress),
-                  ),
-                  SizedBox(height: 8),
-                  Text(_status),
-                ],
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 4,
+                      child: LinearProgressIndicator(value: _progress),
+                    ),
+                    SizedBox(height: 8),
+                    Text(_status),
+                  ],
+                ),
               ),
+            if (_isModelExist) ...[
+              Expanded(
+                child: ListView.builder(
+                  padding: EdgeInsets.all(16),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final message = _messages[index];
+                    final isUser = message.role == Role.user;
+                    return Column(
+                      children: [
+                        Container(
+                            alignment: isUser
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.of(context).size.width * 0.8,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: isUser
+                                    ? Colors.black
+                                    : Colors.deepOrange[100],
+                              ),
+                              padding: EdgeInsets.fromLTRB(10, 5, 10, 5),
+                              child: isUser
+                                  ? Text(message.text,
+                                      softWrap: true,
+                                      overflow: TextOverflow.visible,
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 16))
+                                  : GptMarkdown(
+                                      message.text,
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                            )),
+                        SizedBox(height: 20),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: Offset(0, -1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      reverse: true,
+                      child: TextField(
+                        controller: _questionTextController,
+                        keyboardType: TextInputType.multiline,
+                        enabled: _runningRequestId == null,
+                        maxLines: null,
+                        decoration: InputDecoration(
+                          hintText: 'Type your message...',
+                          border: OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.blue),
+                              borderRadius: BorderRadius.circular(20)),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    SizedBox(
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _runningRequestId != null
+                            ? () => {}
+                            : _runChatInference,
+                        style: ElevatedButton.styleFrom(
+                          enableFeedback: true,
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                        child: _runningRequestId != null
+                            ? Icon(Icons.stop)
+                            : Icon(Icons.send),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

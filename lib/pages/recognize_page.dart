@@ -13,6 +13,8 @@ import 'package:wave/config.dart';
 import 'package:wave/wave.dart';
 import 'package:whisper_flutter_new/whisper_flutter_new.dart';
 
+import '../services/audio_service.dart';
+
 class AudioRecorderScreen extends StatefulWidget {
   const AudioRecorderScreen({super.key});
 
@@ -216,7 +218,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
     });
   }
 
-  Future<void> _analysisVoice(BuildContext context) async {
+  Future<void> _analysisVoice() async {
     if (_isAnalysis) {
       return;
     }
@@ -230,24 +232,12 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
               "https://huggingface.co/ggerganov/whisper.cpp/resolve/main");
       if (_recordingPath != null && _recordingPath!.trim() != "") {
         _timerStopWatch.startStopwatch();
-        final transcription = await whisper.transcribe(
-          transcribeRequest: TranscribeRequest(
-              audio: _recordingPath!,
-              // Path to audio file
-              isTranslate: false,
-              isVerbose: true,
-              language: "vi",
-              // Translate result from audio lang to english text
-              isNoTimestamps: false,
-              nProcessors: Platform.numberOfProcessors - 1,
-              // Get segments in result
-              splitOnWord: true,
-              speedUp: true),
-        );
+        final audioService = AudioService();
+        final result = await audioService.analysis(filePath: _recordingPath!);
         setState(() {
           _isAnalysis = false;
           _isRecording = false;
-          _resultText = transcription.text;
+          _resultText = result;
           _isPlaying = false;
           _recordingPath = null;
         });
@@ -368,7 +358,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
                     height: 60,
                     child: TextButton(
                       onPressed: () async {
-                        _analysisVoice(context);
+                        _analysisVoice();
                       },
                       style: TextButton.styleFrom(backgroundColor: Colors.blue),
                       child: Text(
