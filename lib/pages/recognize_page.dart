@@ -223,7 +223,6 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
     }
     try {
       _resetStateBeforeAnalysis();
-      final modelDir = await _getDownloadDir();
       if (_recordingPath != null && _recordingPath!.trim() != "") {
         _timerStopWatch.startStopwatch();
         final audioService = AudioService();
@@ -352,7 +351,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
                     height: 60,
                     child: TextButton(
                       onPressed: () async {
-                        _analysisVoice();
+                        await _analysisVoice();
                       },
                       style: TextButton.styleFrom(backgroundColor: Colors.blue),
                       child: Text(

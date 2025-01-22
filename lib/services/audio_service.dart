@@ -8,7 +8,7 @@ import 'package:whisper_flutter_new/whisper_flutter_new.dart';
 class AudioService {
   Future<String> analysis({required String filePath}) async {
     final whisper = Whisper(
-        model: WhisperModel.mediumQ8,
+        model: WhisperModel.largeV3Turbo,
         modelDir: await _getDownloadDir(),
         downloadHost:
             "https://huggingface.co/ggerganov/whisper.cpp/resolve/main");

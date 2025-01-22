@@ -38,6 +38,7 @@ class _ChatScreenState extends State<ChatScreen> {
   double _progress = 0;
   String _status = '';
   int? _runningRequestId;
+  bool _isInfer = false;
   List<ChatMessage> _messages = [];
 
   final _modelName = 'qwen2.5-3b-instruct-q5_k_m.gguf';
@@ -102,6 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _runChatInference() async {
     try {
       setState(() {
+        _isInfer = true;
         _messages.add(ChatMessage(
             id: Tsid.getTsid().toLong(),
             text: _questionTextController.text.trim(),
@@ -111,12 +113,12 @@ class _ChatScreenState extends State<ChatScreen> {
         maxTokens: 1024,
         messages: [
           Message(Role.system,
-              """You are MDO assistant, trained by BSSD. Your goal is to help answer user question precisely and concisely from voice analysis data. Do not try to makeup the answer if you are do not know, answer in Vietnamese and markdown format.
+              """You are MDO assistant, trained by BSSD. Your goal is to help answer user question precisely and concisely from voice analysis data. Do not try to makeup the answer if you are do not know, answer in Vietnamese and markdown format, auto correct grammar.
               """),
           Message(Role.user,
               "Chỉ trả lời câu hỏi của tôi với kết quả phân tích giọng nói sau đây\n ${widget.data}"),
           Message(Role.assistant,
-              "Tất nhiên rồi, tôi sẽ chỉ trả lời câu hỏi của bạn với kết quả phân tích bạn cung cấp"),
+              "Tất nhiên rồi, tôi sẽ chỉ trả lời câu hỏi của bạn với kết quả phân tích bạn cung cấp và chỉ trả về định dạng markdown"),
           ...convertFromChat(_messages)
         ],
         numGpuLayers: 99,
@@ -143,6 +145,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _questionTextController.clear();
     } catch (e) {
       print(e);
+    } finally {
+      setState(() {
+        _isInfer = false;
+      });
     }
   }
 
@@ -327,9 +333,8 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(10),
-                                color: isUser
-                                    ? Colors.black
-                                    : Colors.deepOrange[100],
+                                color:
+                                    isUser ? Colors.black : Colors.orange[100],
                               ),
                               padding: EdgeInsets.fromLTRB(10, 5, 10, 5),
                               child: isUser
@@ -395,7 +400,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               horizontal: 16, vertical: 12),
                         ),
                         child: _runningRequestId != null
-                            ? Icon(Icons.stop)
+                            ? Icon(Icons.stop, color: Colors.grey)
                             : Icon(Icons.send),
                       ),
                     )
