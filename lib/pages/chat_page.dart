@@ -40,11 +40,11 @@ class _ChatScreenState extends State<ChatScreen> {
   int? _runningRequestId;
   List<ChatMessage> _messages = [];
 
-  final _modelName = 'qwen2.5-3b-instruct-q2_k.gguf';
+  final _modelName = 'Llama-3.2-3B-Instruct-Q4_K_M.gguf';
   final _downloader = HuggingFaceDownloader(
       modelUrl:
-          'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q2_k.gguf?download=true',
-      fileName: 'qwen2.5-3b-instruct-q2_k.gguf');
+          'https://huggingface.co/unsloth/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf?download=true',
+      fileName: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf');
 
   String? _modelPath;
   final TextEditingController _questionTextController = TextEditingController();
@@ -170,7 +170,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _startDownload({bool force = false}) async {
+  Future<void> _startDownload(
+      {bool force = false, required BuildContext context}) async {
     if (_isDownloading) return;
 
     setState(() {
@@ -206,12 +207,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
             if (await tempFile.exists()) {
               await _moveFile(tempFile, finalPath);
-              setState(() {
-                _status = 'Downloaded';
-                _isDownloading = false;
-                _isModelExist = true;
-                _modelPath = finalPath;
-              });
+              print("Reset chatUI");
+              if (mounted) {
+                setState(() {
+                  print("Reset state to show chat UI");
+                  _isModelExist = true;
+                  _isDownloading = false;
+                  _modelPath = finalPath;
+                });
+              }
             } else {
               throw Exception('Downloaded file not found in temp directory');
             }
@@ -254,7 +258,7 @@ class _ChatScreenState extends State<ChatScreen> {
           PopupMenuButton<String>(
             onSelected: (value) async {
               if (value == 'redownload') {
-                await _startDownload(force: true);
+                await _startDownload(force: true, context: context);
               }
             },
             itemBuilder: (context) => [
@@ -273,15 +277,20 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           children: [
             if (!_isModelExist && !_isDownloading)
-              Padding(
-                padding: EdgeInsets.all(16),
-                child: ElevatedButton(
-                  onPressed: () => _startDownload(),
-                  style: ElevatedButton.styleFrom(
-                      textStyle: TextStyle(fontWeight: FontWeight.w900)),
-                  child: Text('Download Model'),
-                ),
-              ),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(
+                  padding: EdgeInsets.all(16),
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await _startDownload(context: context);
+                      _checkModelExistence();
+                    },
+                    style: ElevatedButton.styleFrom(
+                        textStyle: TextStyle(fontWeight: FontWeight.w900)),
+                    child: Text('Download Model'),
+                  ),
+                )
+              ]),
             if (_isDownloading)
               Padding(
                 padding: EdgeInsets.all(16),

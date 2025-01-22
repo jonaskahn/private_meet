@@ -226,7 +226,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
       _resetStateBeforeAnalysis();
       final modelDir = await _getDownloadDir();
       final whisper = Whisper(
-          model: WhisperModel.medium,
+          model: WhisperModel.mediumQ5,
           modelDir: modelDir,
           downloadHost:
               "https://huggingface.co/ggerganov/whisper.cpp/resolve/main");
