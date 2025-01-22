@@ -40,11 +40,11 @@ class _ChatScreenState extends State<ChatScreen> {
   int? _runningRequestId;
   List<ChatMessage> _messages = [];
 
-  final _modelName = 'Llama-3.2-3B-Instruct-Q4_K_M.gguf';
+  final _modelName = 'qwen2.5-3b-instruct-q5_k_m.gguf';
   final _downloader = HuggingFaceDownloader(
       modelUrl:
-          'https://huggingface.co/unsloth/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf?download=true',
-      fileName: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf');
+          'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q5_k_m.gguf?download=true',
+      fileName: 'qwen2.5-3b-instruct-q5_k_m.gguf');
 
   String? _modelPath;
   final TextEditingController _questionTextController = TextEditingController();

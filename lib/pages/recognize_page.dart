@@ -11,7 +11,6 @@ import 'package:record/record.dart';
 import 'package:timer_stop_watch/timer_stop_watch.dart';
 import 'package:wave/config.dart';
 import 'package:wave/wave.dart';
-import 'package:whisper_flutter_new/whisper_flutter_new.dart';
 
 import '../services/audio_service.dart';
 
@@ -225,11 +224,6 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen> {
     try {
       _resetStateBeforeAnalysis();
       final modelDir = await _getDownloadDir();
-      final whisper = Whisper(
-          model: WhisperModel.mediumQ5,
-          modelDir: modelDir,
-          downloadHost:
-              "https://huggingface.co/ggerganov/whisper.cpp/resolve/main");
       if (_recordingPath != null && _recordingPath!.trim() != "") {
         _timerStopWatch.startStopwatch();
         final audioService = AudioService();
